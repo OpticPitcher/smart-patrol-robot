@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Login | SimerCDN</title>
+  <link href="/style.css" rel="stylesheet" type="text/css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<div id="contact">
+  <h3>Login
+    <hr>
+  </h3>
+  <div class="form">
+    <form method="post" action="/login" class="formula">
+      <p><textarea class="w3-input w3-padding-16" type="text" id='username' placeholder="Username" cols="47" rows="1"
+          required name="username" autofocus></textarea></p>
+      <p><input class="w3-input w3-padding-16" type="password" id='password' placeholder="Password" required
+          name="password">
+      </p>
+      <p>
+        <% if (messages.error) { %>
+          <%= messages.error %>
+            <% } %>
+      </p>
+      <p><input class="w3-button w3-light-grey w3-padding-large submit" type="submit" value="SMASH!"></input>
+      </p>
+    </form>
+  </div>
+
+</html>

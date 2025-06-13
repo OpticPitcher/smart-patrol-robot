@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TurtleBot3 Control Panel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <style>
+        :root {
+            --main-bg: #0b0c0f;
+            --accent-color: #ff1b6b;
+            --text-color: #ffffff;
+            --overlay-bg: rgba(11, 12, 15, 0.9);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            width: 100vw;
+            background: var(--main-bg);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header Section */
+        .header {
+            height: 60px;
+            padding: 0 2rem;
+            /* background: rgba(255, 255, 255, 0.1); */
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            /* border-bottom: 2px solid var(--accent-color); */
+        }
+
+        .header-section {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .title {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: transparent;
+            color: var(--text-color);
+            border: 2px solid var(--accent-color);
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: var(--accent-color);
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        /* Main View Section */
+        .main-container {
+            flex: 1;
+            position: relative;
+            margin: 20px;
+            margin-top: 0px;
+            border: 2px solid var(--accent-color);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .live-feed {
+            width: 100%;
+            height: 100%;
+            background: var(--main-bg);
+        }
+
+        .minimap {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 250px;
+            height: 200px;
+            border: 2px solid var(--accent-color);
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        /* Controls Section */
+        .controls-section {
+            height: 300px;
+            padding: 1rem 2rem;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            border-top: 2px solid var(--accent-color);
+            gap: 2rem;
+        }
+
+        .terminal-container {
+            display: none;  /* Hidden by default on mobile */
+            height: 100%;
+            flex: 1;  /* Take up remaining space */
+            border: 1px solid var(--accent-color);
+            border-radius: 10px;
+            overflow: hidden;
+            background: transparent;  /* Removed black background */
+        }
+
+        /* Show terminal on larger screens */
+        @media (min-width: 1200px) {
+            .terminal-container {
+                display: block;
+            }
+
+            .controls-section {
+                justify-content: space-between;
+            }
+        }
+
+        .controls-wrapper {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            min-width: fit-content;  /* Prevent controls from shrinking */
+        }
+
+        .left-controls {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        /* D-Pad */
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 5px;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+        }
+
+        .d-pad.enabled {
+            opacity: 1;
+        }
+
+        .d-pad button {
+            background: transparent;
+            border: 2px solid var(--accent-color);
+            color: var(--text-color);
+            cursor: pointer;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .d-pad button:hover:not(:empty) {
+            background: var(--accent-color);
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        .d-pad button:empty {
+            border: none;
+            background: transparent;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex;
+            gap: 2px;
+            background: rgba(255, 27, 107, 0.1);
+            padding: 2px;
+            border-radius: 50px;
+            border: 1px solid #ff1b6b;
+        }
+
+        .mode-btn {
+            padding: 6px 16px;
+            background: transparent;
+            border: none;
+            color: #fff;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .mode-btn.active {
+            background: #ff1b6b;
+        }
+
+        /* Control Cluster */
+        .control-cluster {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            max-width: 600px;
+        }
+
+        .control-btn {
+            background: transparent;
+            border: 1px solid #ff1b6b;
+            color: #fff;
+            padding: 8px 20px;
+            cursor: pointer;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 90px;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 27, 107, 0.1);
+            box-shadow: 0 0 10px rgba(255, 27, 107, 0.2);
+        }
+
+        .control-btn i {
+            font-size: 0.8rem;
+        }
+
+        /* Home controls group */
+        .home-controls {
+            display: flex;
+            gap: 2px;
+        }
+
+        .home-controls .control-btn {
+            min-width: 70px;
+        }
+
+        /* Emergency stop */
+        .emergency-stop {
+            width: 100%;
+            max-width: 300px;
+            justify-content: center;
+            border-color: #ff1b6b;
+        }
+
+        .emergency-stop:hover {
+            background: rgba(255, 27, 107, 0.1);
+        }
+
+        @media (max-width: 1200px) {
+            .control-cluster {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .controls-section {
+                height: auto;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .left-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .control-cluster {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="header-section">
+            <div id="datetime"></div>
+        </div>
+        <div class="title">Welcome, <%= username %>
+        </div>
+        <form action="/logout?_method=DELETE" method="POST" style="margin: 0;">
+            <button type="submit" class="logout-btn">LOGOUT</button>
+        </form>
+    </div>
+
+    <div class="main-container">
+        <iframe class="live-feed" src="https://swiftor.io" frameborder="0"></iframe>
+        <iframe class="minimap" src="/minimap.jpg" frameborder="0"></iframe>
+    </div>
+
+    <div class="controls-section">
+        <div class="controls-wrapper">
+            <div class="left-controls">
+                <div class="d-pad" id="d-pad">
+                    <button></button>
+                    <button onclick="sendCommand('forward')"><i class="fas fa-chevron-up"></i></button>
+                    <button></button>
+                    <button onclick="sendCommand('left')"><i class="fas fa-chevron-left"></i></button>
+                    <button onclick="sendCommand('setWaypoint')"><i class="fas fa-map-marker-alt"></i></button>
+                    <button onclick="sendCommand('right')"><i class="fas fa-chevron-right"></i></button>
+                    <button></button>
+                    <button onclick="sendCommand('backward')"><i class="fas fa-chevron-down"></i></button>
+                    <button></button>
+                </div>
+
+                <div class="mode-toggle">
+                    <button class="mode-btn" onclick="toggleMode('manual')">Manual</button>
+                    <button class="mode-btn active" onclick="toggleMode('auto')">Auto</button>
+                </div>
+            </div>
+
+            <div class="control-cluster">
+                <button class="control-btn" onclick="sendCommand('init')">
+                    <i class="fas fa-power-off"></i> Init
+                </button>
+                <button class="control-btn" onclick="sendCommand('clear')">
+                    <i class="fas fa-eraser"></i> Clear
+                </button>
+                <button class="control-btn" onclick="sendCommand('mark')">
+                    <i class="fas fa-map-marker-alt"></i> Mark
+                </button>
+                
+                <div class="home-controls">
+                    <button class="control-btn" onclick="sendCommand('setHome')">
+                        <i class="fas fa-home"></i> Set
+                    </button>
+                    <button class="control-btn" onclick="sendCommand('goHome')">
+                        <i class="fas fa-location-arrow"></i> Go
+                    </button>
+                </div>
+
+                <button class="control-btn" onclick="sendCommand('logs')">
+                    <i class="fas fa-file-download"></i> Logs
+                </button>
+                <button class="control-btn" onclick="sendCommand('calibrate')">
+                    <i class="fas fa-crosshairs"></i> Cal
+                </button>
+                <button class="control-btn" onclick="sendCommand('config')">
+                    <i class="fas fa-cog"></i> Config
+                </button>
+                <button class="control-btn" onclick="sendCommand('reset')">
+                    <i class="fas fa-sync"></i> Reset
+                </button>
+                <button class="control-btn" onclick="sendCommand('battery')">
+                    <i class="fas fa-battery-three-quarters"></i> Batt
+                </button>
+                <button class="control-btn" onclick="sendCommand('network')">
+                    <i class="fas fa-wifi"></i> Net
+                </button>
+                
+                <button class="control-btn emergency-stop" onclick="sendCommand('stop')">
+                    <i class="fas fa-stop-circle"></i> Stop
+                </button>
+            </div>
+        </div>
+
+        <div class="terminal-container" id="terminal"></div>
+    </div>
+
+    <script>
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('datetime').textContent = now.toLocaleString();
+        }
+
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        function toggleMode(mode) {
+            const dpad = document.getElementById('d-pad');
+            const buttons = document.querySelectorAll('.mode-btn');
+
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase() === mode) {
+                    btn.classList.add('active');
+                }
+            });
+
+            if (mode === 'manual') {
+                dpad.classList.add('enabled');
+            } else {
+                dpad.classList.remove('enabled');
+            }
+        }
+
+        async function sendCommand(command) {
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ command })
+                });
+                const data = await response.json();
+                console.log('Command sent:', data);
+            } catch (error) {
+                console.error('Error sending command:', error);
+            }
+        }
+
+        // Initialize in auto mode
+        toggleMode('auto');
+
+        // Initialize Terminal
+        const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'Consolas, monospace',
+            theme: {
+                background: 'transparent',
+                foreground: '#fff',
+                cursor: '#ff1b6b'
+            },
+            scrollback: 1000,  /* Allow scrolling through 1000 lines of history */
+            convertEol: true   /* Ensure proper line endings */
+        });
+
+        // Open terminal in container
+        term.open(document.getElementById('terminal'));
+
+        // Add welcome message
+        term.writeln('\x1B[1;35m=== TurtleBot3 Terminal ===\x1B[0m');
+        term.writeln('Type "help" for available commands');
+        term.write('\r\n$ ');
+
+        // Handle terminal input
+        let currentLine = '';
+        term.onKey(({ key, domEvent }) => {
+            const printable = !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
+
+            if (domEvent.keyCode === 13) { // Enter key
+                term.write('\r\n');
+                handleCommand(currentLine);
+                currentLine = '';
+                term.write('$ ');
+            } else if (domEvent.keyCode === 8) { // Backspace
+                if (currentLine.length > 0) {
+                    currentLine = currentLine.slice(0, -1);
+                    term.write('\b \b');
+                }
+            } else if (printable) {
+                currentLine += key;
+                term.write(key);
+            }
+        });
+
+        // Handle commands
+        function handleCommand(cmd) {
+            cmd = cmd.trim().toLowerCase();
+            switch(cmd) {
+                case 'help':
+                    term.writeln('Available commands:');
+                    term.writeln('  help     - Show this help message');
+                    term.writeln('  clear    - Clear terminal');
+                    term.writeln('  status   - Show robot status');
+                    break;
+                case 'clear':
+                    term.clear();
+                    break;
+                case 'status':
+                    term.writeln('Robot Status:');
+                    term.writeln('  Battery: 75%');
+                    term.writeln('  Mode: Auto');
+                    term.writeln('  Position: X:0.0 Y:0.0 Z:0.0');
+                    break;
+                default:
+                    if (cmd !== '')
+                        term.writeln(`Command not found: ${cmd}`);
+                    break;
+            }
+        }
+
+        // Update terminal when commands are sent from buttons
+        const originalSendCommand = sendCommand;
+        sendCommand = async function(command) {
+            await originalSendCommand(command);
+            term.writeln(`\r\nExecuting command: ${command}`);
+            term.write('$ ');
+        };
+    </script>
+</body>
+
+</html>

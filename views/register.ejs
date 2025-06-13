@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Register | SimerCDN</title>
+  <link href="/style.css" rel="stylesheet" type="text/css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<div id="contact">
+  <h3>Register
+    <hr>
+  </h3>
+  <p>By signing up, you agree to our terms and privacy policy</p>
+  <div class="form">
+    <form method="post" action="/register" class="formula" onsubmit="return validateForm()">
+      <p><textarea class="w3-input w3-padding-16" type="text" id='fullname' placeholder="Fullname" cols="47" rows="1"
+          required name="fullname" autofocus></textarea></p>
+
+      <p><input class="w3-input w3-padding-16" type="username" id='username' placeholder="Username" required
+          name="username"></p>
+
+      <p>
+        <input class="w3-input w3-padding-16" type="password" id='password1' placeholder="Password" required
+          oninput="checkPasswords()" name="password">
+      </p>
+
+      <p style="position: relative;">
+        <input class="w3-input w3-padding-16" type="password" id='password2' placeholder="Confirm Password" required
+          name="confirmPassword" oninput="checkPasswords()">
+        <span id="passwordMatch"
+          style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: none;">✓</span>
+        <span id="passwordMismatch"
+          style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: none; color: red;">✗</span>
+      </p>
+      <p>
+        <% if (messages.error) { %>
+          <%= messages.error %>
+            <% } %>
+      </p>
+      <p><input class="w3-button w3-light-grey w3-padding-large submit" type="submit" value="REGISTER!"></p>
+    </form>
+
+    <script>
+      function checkPasswords() {
+        const password1 = document.getElementById('password1').value;
+        const password2 = document.getElementById('password2').value;
+        const matchIndicator = document.getElementById('passwordMatch');
+        const mismatchIndicator = document.getElementById('passwordMismatch');
+
+        if (password1 && password2) {
+          if (password1 === password2) {
+            matchIndicator.style.display = 'block';
+            matchIndicator.style.color = 'green';
+            mismatchIndicator.style.display = 'none';
+          } else {
+            matchIndicator.style.display = 'none';
+            mismatchIndicator.style.display = 'block';
+          }
+        } else {
+          matchIndicator.style.display = 'none';
+          mismatchIndicator.style.display = 'none';
+        }
+      }
+
+      function validateForm() {
+        const password1 = document.getElementById('password1').value;
+        const password2 = document.getElementById('password2').value;
+
+        if (password1 !== password2) {
+          alert('Passwords do not match!');
+          return false;
+        }
+        return true;
+      }
+    </script>
+  </div>
+
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Control Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Minimap overlay -->
+        <div class="minimap">
+            <img src="https://via.placeholder.com/200x200/0b0c0f/ff1b6b?text=Minimap" alt="Minimap View">
+        </div>
+
+        <!-- Main field view -->
+        <div class="main-view">
+            <div class="main-view-header">
+                <span class="main-view-title">SMART SURVEILLANCE V1</span>
+                <a href="/logout" class="logout-btn">LOGOUT</a>
+            </div>
+            <img src="https://via.placeholder.com/1920x1080/0b0c0f/ff1b6b?text=Live+Field+View" alt="Field View">
+        </div>
+
+        <!-- Control section -->
+        <div class="control-section">
+            <div class="mode-toggle">
+                <button class="mode-btn manual" onclick="toggleMode('manual')">Manual</button>
+                <button class="mode-btn auto active" onclick="toggleMode('auto')">Auto</button>
+            </div>
+
+            <div class="robot-controls">
+                <button class="control-btn" onclick="sendCommand('initializeRobot')">
+                    <i class="fas fa-power-off"></i> Init
+                </button>
+                <button class="control-btn" onclick="sendCommand('clearWaypoints')">
+                    <i class="fas fa-eraser"></i> Clear
+                </button>
+                <button class="control-btn" onclick="sendCommand('setMarker')">
+                    <i class="fas fa-map-marker-alt"></i> Mark
+                </button>
+                
+                <div class="home-controls">
+                    <button class="home-btn" onclick="sendCommand('setHome')">
+                        <i class="fas fa-home"></i> Set
+                    </button>
+                    <button class="home-btn" onclick="sendCommand('goHome')">
+                        <i class="fas fa-location-arrow"></i> Go
+                    </button>
+                </div>
+
+                <button class="control-btn" onclick="sendCommand('downloadLogs')">
+                    <i class="fas fa-file-download"></i> Logs
+                </button>
+                <button class="control-btn" onclick="sendCommand('calibrate')">
+                    <i class="fas fa-crosshairs"></i> Cal
+                </button>
+                <button class="control-btn" onclick="sendCommand('settings')">
+                    <i class="fas fa-cog"></i> Config
+                </button>
+                <button class="control-btn" onclick="sendCommand('reboot')">
+                    <i class="fas fa-sync"></i> Reset
+                </button>
+                <button class="control-btn" onclick="sendCommand('battery')">
+                    <i class="fas fa-battery-three-quarters"></i> Batt
+                </button>
+                <button class="control-btn" onclick="sendCommand('network')">
+                    <i class="fas fa-wifi"></i> Net
+                </button>
+
+                <button class="control-btn danger" onclick="sendCommand('emergencyStop')">
+                    <i class="fas fa-stop-circle"></i> Stop
+                </button>
+            </div>
+
+            <div class="controls" id="manual-controls">
+                <div class="d-pad">
+                    <button class="d-btn up" onclick="sendCommand('up')">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                    <button class="d-btn right" onclick="sendCommand('right')">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button class="d-btn down" onclick="sendCommand('down')">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="d-btn left" onclick="sendCommand('left')">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="d-btn center" onclick="sendCommand('setWaypoint')">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleMode(mode) {
+            const controls = document.getElementById('manual-controls');
+            const manualBtn = document.querySelector('.mode-btn.manual');
+            const autoBtn = document.querySelector('.mode-btn.auto');
+
+            if (mode === 'manual') {
+                controls.classList.remove('disabled');
+                manualBtn.classList.add('active');
+                autoBtn.classList.remove('active');
+            } else {
+                controls.classList.add('disabled');
+                autoBtn.classList.add('active');
+                manualBtn.classList.remove('active');
+            }
+        }
+
+        async function sendCommand(command) {
+            try {
+                const response = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ command })
+                });
+                const data = await response.json();
+                console.log('Command sent:', data);
+            } catch (error) {
+                console.error('Error sending command:', error);
+            }
+        }
+
+        // Initialize in auto mode
+        toggleMode('auto');
+    </script>
+</body>
+</html>

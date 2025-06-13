@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimerCDN Control Panel</title>
+    <link href="/style.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #0b0c0f;
+            color: white;
+        }
+
+        .header {
+            height: 60px;
+            padding: 0 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--main-decor-color);
+        }
+
+        .welcome-section {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            color: var(--main-fonts-color);
+            font-family: var(--main-font-family);
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: transparent;
+            color: var(--main-fonts-color);
+            border: 2px solid var(--main-decor-color);
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: var(--main-decor-color);
+            color: var(--main-background);
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        .main-section {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            background: var(--main-background);
+            border: 2px solid var(--main-decor-color);
+            margin: 20px;
+            border-radius: 10px;
+        }
+
+        .minimap {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            height: 150px;
+            border: 2px solid var(--main-decor-color);
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        .controls-section {
+            height: 120px;
+            padding: 1rem 2rem;
+            background: rgba(11, 12, 15, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 2px solid var(--main-decor-color);
+            gap: 2rem;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(3, 50px);
+            gap: 5px;
+        }
+
+        .d-pad button {
+            background: transparent;
+            border: 2px solid var(--main-decor-color);
+            color: var(--main-fonts-color);
+            cursor: pointer;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .d-pad button:hover {
+            background: var(--main-decor-color);
+            color: var(--main-background);
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        .d-pad button:empty {
+            border: none;
+            background: transparent;
+            cursor: default;
+        }
+
+        .control-cluster {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(100px, 1fr));
+            gap: 10px;
+            flex: 1;
+            max-width: 800px;
+        }
+
+        .control-cluster button {
+            background: transparent;
+            border: 2px solid var(--main-decor-color);
+            color: var(--main-fonts-color);
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            min-width: 80px;
+            font-family: var(--main-font-family);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .control-cluster button:hover {
+            background: var(--main-decor-color);
+            color: var(--main-background);
+            box-shadow: 0 0 20px rgba(255, 27, 107, 0.3);
+        }
+
+        .emergency-stop {
+            background: transparent !important;
+            border-color: #ff4444 !important;
+            grid-column: span 2;
+        }
+
+        .emergency-stop:hover {
+            background: #ff4444 !important;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.3) !important;
+        }
+
+        @media (max-width: 1200px) {
+            .control-cluster {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .emergency-stop {
+                grid-column: span 3;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .controls-section {
+                height: auto;
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+
+            .control-cluster {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .emergency-stop {
+                grid-column: span 2;
+            }
+
+            .d-pad {
+                grid-template-columns: repeat(3, 40px);
+                grid-template-rows: repeat(3, 40px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="welcome-section">
+            <div>Welcome, <%= username %></div>
+            <div id="datetime"></div>
+        </div>
+        <a href="/logout" class="logout-btn">LOGOUT</a>
+    </div>
+
+    <div class="main-section">
+        <div class="minimap">
+            <!-- Minimap content -->
+             <img src="/minimap.jpg" />
+        </div>
+        <!-- Main view content -->
+    </div>
+
+    <div class="controls-section">
+        <div class="d-pad">
+            <button></button>
+            <button onclick="sendCommand('forward')"><i class="fas fa-chevron-up"></i></button>
+            <button></button>
+            <button onclick="sendCommand('left')"><i class="fas fa-chevron-left"></i></button>
+            <button onclick="sendCommand('center')"><i class="fas fa-map-marker-alt"></i></button>
+            <button onclick="sendCommand('right')"><i class="fas fa-chevron-right"></i></button>
+            <button></button>
+            <button onclick="sendCommand('backward')"><i class="fas fa-chevron-down"></i></button>
+            <button></button>
+        </div>
+
+        <div class="control-cluster">
+            <button onclick="sendCommand('init')"><i class="fas fa-power-off"></i> Init</button>
+            <button onclick="sendCommand('clear')"><i class="fas fa-eraser"></i> Clear</button>
+            <button onclick="sendCommand('mark')"><i class="fas fa-map-marker-alt"></i> Mark</button>
+            <button onclick="sendCommand('calibrate')"><i class="fas fa-crosshairs"></i> Cal</button>
+            <button onclick="sendCommand('settings')"><i class="fas fa-cog"></i> Config</button>
+            <button onclick="sendCommand('battery')"><i class="fas fa-battery-three-quarters"></i> Batt</button>
+            <button onclick="sendCommand('network')"><i class="fas fa-wifi"></i> Net</button>
+            <button class="emergency-stop" onclick="sendCommand('stop')"><i class="fas fa-stop-circle"></i> STOP</button>
+        </div>
+    </div>
+
+    <script>
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('datetime').textContent = now.toLocaleString();
+        }
+
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+
+        function sendCommand(command) {
+            console.log('Sending command:', command);
+            // Add your command sending logic here
+        }
+    </script>
+</body>
+</html>
