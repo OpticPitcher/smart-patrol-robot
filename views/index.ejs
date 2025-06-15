@@ -424,7 +424,7 @@
     </div>
 
     <div class="main-container">
-        <iframe class="live-feed" src="" frameborder="0"></iframe>
+        <canvas id="videoCanvas" class="live-feed"></canvas>
         <iframe class="minimap" src="/minimap.jpg" frameborder="0"></iframe>
     </div>
 
@@ -524,19 +524,131 @@
             }
         }
 
+        // Initialize WebSocket connection
+        let robotWs = null;
+        let videoCanvas = document.getElementById('videoCanvas');
+        let ctx = videoCanvas.getContext('2d');
+        let img = new Image();
+
+        // Set initial canvas size
+        function resizeCanvas() {
+            const container = videoCanvas.parentElement;
+            videoCanvas.width = container.clientWidth;
+            videoCanvas.height = container.clientHeight;
+        }
+
+        // Call resize on load and window resize
+        window.addEventListener('load', resizeCanvas);
+        window.addEventListener('resize', resizeCanvas);
+
+        function connectWebSocket() {
+            if (!robotWs || robotWs.readyState === WebSocket.CLOSED) {
+                robotWs = new WebSocket('ws://' + window.location.hostname + ':8766');
+                
+                robotWs.onopen = function() {
+                    console.log('Connected to robot control server');
+                    term.writeln('\r\nConnected to robot control server');
+                };
+                
+                robotWs.onmessage = function(event) {
+                    try {
+                        const response = JSON.parse(event.data);
+                        
+                        if (response.type === 'camera') {
+                            // Debug log
+                            console.log('Received camera data:', response.data.substring(0, 50) + '...');
+                            
+                            // Create base64 image data
+                            const base64Image = 'data:image/jpeg;base64,' + response.data;
+                            
+                            // Debug log
+                            console.log('Created base64 image:', base64Image.substring(0, 50) + '...');
+                            
+                            // Load the image
+                            img.src = base64Image;
+                        } else {
+                            console.log('Command response:', response);
+                        }
+                    } catch (error) {
+                        console.error('Error processing WebSocket message:', error);
+                        term.writeln('\r\nError processing WebSocket message: ' + error);
+                    }
+                };
+                
+                robotWs.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    term.writeln('\r\nWebSocket error: ' + error);
+                };
+                
+                robotWs.onclose = function() {
+                    console.log('Disconnected from robot control server');
+                    term.writeln('\r\nDisconnected from robot control server');
+                    setTimeout(connectWebSocket, 5000);
+                };
+            }
+        }
+
+        // Handle image loading
+        img.onload = function() {
+            console.log('Image loaded successfully');
+            try {
+                // Get container dimensions
+                const container = videoCanvas.parentElement;
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
+                
+                // Calculate aspect ratio
+                const aspectRatio = img.width / img.height;
+                
+                // Calculate new dimensions
+                let width = containerWidth;
+                let height = containerWidth / aspectRatio;
+                
+                if (height > containerHeight) {
+                    height = containerHeight;
+                    width = containerHeight * aspectRatio;
+                }
+                
+                // Update canvas size
+                videoCanvas.width = width;
+                videoCanvas.height = height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                // Draw the image
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                console.log('Image drawn successfully');
+            } catch (error) {
+                console.error('Error drawing image:', error);
+            }
+        };
+
+        img.onerror = function(error) {
+            console.error('Error loading image:', error);
+            term.writeln('\r\nError loading image: ' + error);
+        };
+
+        // Connect WebSocket when page loads
+        connectWebSocket();
+
+        // Update the sendCommand function to use the global robotWs
         async function sendCommand(command) {
             try {
-                const response = await fetch('/api/command', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ command })
-                });
-                const data = await response.json();
-                console.log('Command sent:', data);
+                if (robotWs && robotWs.readyState === WebSocket.OPEN) {
+                    robotWs.send(JSON.stringify({ command }));
+                    term.writeln(`\r\nExecuting command: ${command}`);
+                    term.write('$ ');
+                } else {
+                    console.error('WebSocket is not connected');
+                    term.writeln('\r\nError: WebSocket is not connected');
+                    term.write('$ ');
+                }
             } catch (error) {
                 console.error('Error sending command:', error);
+                term.writeln('\r\nError sending command: ' + error);
+                term.write('$ ');
             }
         }
 
@@ -611,14 +723,6 @@
                     break;
             }
         }
-
-        // Update terminal when commands are sent from buttons
-        const originalSendCommand = sendCommand;
-        sendCommand = async function (command) {
-            await originalSendCommand(command);
-            term.writeln(`\r\nExecuting command: ${command}`);
-            term.write('$ ');
-        };
     </script>
 </body>
 
