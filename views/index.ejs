@@ -407,6 +407,51 @@
                 grid-template-columns: repeat(2, 1fr);
             }
         }
+
+        /* Battery Status Styles */
+        .battery-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            background: rgba(255, 27, 107, 0.1);
+            border-radius: 20px;
+            margin-left: 20px;
+        }
+
+        .battery-status i {
+            font-size: 1.2rem;
+            color: var(--accent-color);
+        }
+
+        .battery-status span {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        /* Battery level colors */
+        .battery-status.critical i {
+            color: #ff4444;
+            animation: blink 1s infinite;
+        }
+
+        .battery-status.low i {
+            color: #ffbb33;
+        }
+
+        .battery-status.medium i {
+            color: #ffeb3b;
+        }
+
+        .battery-status.good i {
+            color: #00C851;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 
@@ -415,9 +460,12 @@
     <div class="header">
         <div class="header-section">
             <div id="datetime"></div>
+            <div id="battery-status" class="battery-status">
+                <i class="fas fa-battery-full"></i>
+                <span id="battery-percentage">--%</span>
+            </div>
         </div>
-        <div class="title">Welcome, <%= username %>
-        </div>
+        <div class="title">Welcome, <%= username %></div>
         <form action="/logout?_method=DELETE" method="POST" style="margin: 0;">
             <button type="submit" class="logout-btn">LOGOUT</button>
         </form>
@@ -593,6 +641,46 @@
         window.addEventListener('load', resizeCanvas);
         window.addEventListener('resize', resizeCanvas);
 
+        // Battery status update function
+        function updateBatteryStatus(data) {
+            const batteryStatus = document.getElementById('battery-status');
+            const batteryPercentage = document.getElementById('battery-percentage');
+            const percentage = Math.round(data.percentage);
+            
+            // Update percentage text
+            batteryPercentage.textContent = `${percentage}%`;
+            
+            // Update icon class based on percentage
+            const icon = batteryStatus.querySelector('i');
+            icon.className = 'fas ' + getBatteryIcon(percentage);
+            
+            // Update status class
+            batteryStatus.className = 'battery-status ' + getBatteryStatusClass(percentage);
+            
+            // Update terminal with detailed battery info
+            term.writeln(`\r\nBattery Status Update:`);
+            term.writeln(`Percentage: ${percentage}%`);
+            term.writeln(`Voltage: ${data.voltage.toFixed(2)}V`);
+            term.writeln(`Current: ${data.current.toFixed(2)}A`);
+            term.writeln(`Power Supply Status: ${data.power_supply_status}`);
+            term.write('$ ');
+        }
+
+        function getBatteryIcon(percentage) {
+            if (percentage >= 90) return 'fa-battery-full';
+            if (percentage >= 70) return 'fa-battery-three-quarters';
+            if (percentage >= 40) return 'fa-battery-half';
+            if (percentage >= 20) return 'fa-battery-quarter';
+            return 'fa-battery-empty';
+        }
+
+        function getBatteryStatusClass(percentage) {
+            if (percentage <= 10) return 'critical';
+            if (percentage <= 25) return 'low';
+            if (percentage <= 50) return 'medium';
+            return 'good';
+        }
+
         function connectWebSocket() {
             if (!robotWs || robotWs.readyState === WebSocket.CLOSED) {
                 robotWs = new WebSocket('ws://' + window.location.hostname + ':8766');
@@ -615,8 +703,9 @@
                         } else if (response.type === 'scan') {
                             currentScan = response.data;
                             drawMap();
+                        } else if (response.type === 'battery') {
+                            updateBatteryStatus(response.data);
                         } else if (response.status === 'success' && response.velocities) {
-                            // Update terminal with current velocities
                             term.writeln(`\r\nLinear: ${response.velocities.linear.toFixed(2)} m/s`);
                             term.writeln(`Angular: ${response.velocities.angular.toFixed(2)} rad/s`);
                             term.write('$ ');
@@ -628,12 +717,12 @@
                 };
                 
                 robotWs.onerror = function(error) {
-                    console.error('WebSocket error:', error);
+                        console.error('WebSocket error:', error);
                     term.writeln('\r\nWebSocket error: ' + error);
-                };
-                
+                    };
+                    
                 robotWs.onclose = function() {
-                    console.log('Disconnected from robot control server');
+                        console.log('Disconnected from robot control server');
                     term.writeln('\r\nDisconnected from robot control server');
                     setTimeout(connectWebSocket, 5000);
                 };
@@ -771,7 +860,7 @@
                         }));
                     } else {
                         term.writeln('\r\nManual mode is not active. Switch to manual mode to control the robot.');
-                        term.write('$ ');
+                    term.write('$ ');
                     }
                 } else {
                     console.error('WebSocket is not connected');
