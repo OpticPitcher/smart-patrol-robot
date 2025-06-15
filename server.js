@@ -14,6 +14,12 @@ const rclnodejs = require('rclnodejs');
 // Set ROS_DOMAIN_ID
 process.env.ROS_DOMAIN_ID = '30';
 
+// Constants for Waffle Pi
+const MAX_LINEAR_VEL = 0.26;
+const MAX_ANGULAR_VEL = 1.82;
+const LINEAR_STEP = 0.01;
+const ANGULAR_STEP = 0.1;
+
 // Passport Initialize
 const initializePassport = require('./passport-config');
 initializePassport(
@@ -42,6 +48,10 @@ let publisher;
 let cameraSubscriber;
 let scanSubscriber;
 let mapSubscriber;
+
+// Store current velocities
+let currentLinearVel = 0.0;
+let currentAngularVel = 0.0;
 
 async function initROS() {
   try {
@@ -128,71 +138,82 @@ async function initROS() {
       }
     );
 
+    // Publish velocity command
+    function publishVelocity() {
+      const twist = {
+        linear: { x: currentLinearVel, y: 0.0, z: 0.0 },
+        angular: { x: 0.0, y: 0.0, z: currentAngularVel }
+      };
+      publisher.publish(twist);
+    }
+
+    // WebSocket server setup
+    const wss = new WebSocket.Server({ port: 8766 });
+
+    wss.on('connection', function connection(ws) {
+      console.log('New WebSocket connection');
+      
+      ws.on('message', function incoming(message) {
+        try {
+          const data = JSON.parse(message);
+          
+          if (data.type === 'control') {
+            const command = data.command;
+            
+            switch(command) {
+              case 'forward':
+                currentLinearVel = Math.min(currentLinearVel + LINEAR_STEP, MAX_LINEAR_VEL);
+                break;
+              case 'backward':
+                currentLinearVel = Math.max(currentLinearVel - LINEAR_STEP, -MAX_LINEAR_VEL);
+                break;
+              case 'left':
+                currentAngularVel = Math.min(currentAngularVel + ANGULAR_STEP, MAX_ANGULAR_VEL);
+                break;
+              case 'right':
+                currentAngularVel = Math.max(currentAngularVel - ANGULAR_STEP, -MAX_ANGULAR_VEL);
+                break;
+              case 'stop':
+                currentLinearVel = 0.0;
+                currentAngularVel = 0.0;
+                break;
+            }
+            
+            publishVelocity();
+            
+            // Send response back to client
+            ws.send(JSON.stringify({
+              status: 'success',
+              command: command,
+              velocities: {
+                linear: currentLinearVel,
+                angular: currentAngularVel
+              }
+            }));
+          } else if (data.type === 'mode') {
+            if (data.mode === 'auto') {
+              // Stop the robot when switching to auto mode
+              currentLinearVel = 0.0;
+              currentAngularVel = 0.0;
+              publishVelocity();
+            }
+          }
+        } catch (error) {
+          console.error('Error processing message:', error);
+          ws.send(JSON.stringify({
+            status: 'error',
+            message: error.message
+          }));
+        }
+      });
+    });
+
     node.spin();
     console.log('ROS 2 node initialized successfully on domain ID:', process.env.ROS_DOMAIN_ID);
   } catch (error) {
     console.error('Error initializing ROS 2 node:', error);
   }
 }
-
-// WebSocket server setup
-const wss = new WebSocket.Server({ port: 8766 });
-
-wss.on('connection', function connection(ws) {
-  console.log('New WebSocket connection');
-  
-  ws.on('message', function incoming(message) {
-    try {
-      const data = JSON.parse(message);
-      const command = data.command;
-      
-      // Create Twist message
-      const twist = {
-        linear: { x: 0.0, y: 0.0, z: 0.0 },
-        angular: { x: 0.0, y: 0.0, z: 0.0 }
-      };
-      
-      // Map commands to robot movements
-      switch(command) {
-        case 'forward':
-          twist.linear.x = 0.5;
-          twist.angular.z = 0.0;
-          break;
-        case 'backward':
-          twist.linear.x = -0.5;
-          twist.angular.z = 0.0;
-          break;
-        case 'left':
-          twist.linear.x = 0.0;
-          twist.angular.z = 0.5;
-          break;
-        case 'right':
-          twist.linear.x = 0.0;
-          twist.angular.z = -0.5;
-          break;
-        case 'stop':
-          twist.linear.x = 0.0;
-          twist.angular.z = 0.0;
-          break;
-      }
-      
-      // Publish the message
-      publisher.publish(twist);
-      
-      // Send response back to client
-      ws.send(JSON.stringify({
-        status: 'success',
-        command: command
-      }));
-    } catch (error) {
-      console.error('Error processing message:', error);
-      ws.send(JSON.stringify({
-        status: 'error',
-        message: error.message
-      }));
-    }
-  });
-});
 
 //--------------------------------------GETS--------------------------------------//
 app.get('/', checkAuthenticated, (req, res) => {
