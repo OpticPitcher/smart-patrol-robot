@@ -140,7 +140,7 @@ async function initROS() {
               }));
             }
           });
-        } catch (error) {
+  } catch (error) {
           console.error('Error processing scan data:', error);
         }
       }
@@ -184,35 +184,35 @@ async function initROS() {
         angular: { x: 0.0, y: 0.0, z: currentAngularVel }
       };
       publisher.publish(twist);
-    }
+}
 
-    // WebSocket server setup
-    const wss = new WebSocket.Server({ port: 8766 });
+// WebSocket server setup
+const wss = new WebSocket.Server({ port: 8766 });
 
-    wss.on('connection', function connection(ws) {
-      console.log('New WebSocket connection');
-      
-      ws.on('message', function incoming(message) {
-        try {
-          const data = JSON.parse(message);
+wss.on('connection', function connection(ws) {
+  console.log('New WebSocket connection');
+  
+  ws.on('message', function incoming(message) {
+    try {
+      const data = JSON.parse(message);
           
           if (data.type === 'control') {
-            const command = data.command;
-            
-            switch(command) {
-              case 'forward':
+      const command = data.command;
+      
+      switch(command) {
+        case 'forward':
                 currentLinearVel = Math.min(currentLinearVel + LINEAR_STEP, MAX_LINEAR_VEL);
-                break;
-              case 'backward':
+          break;
+        case 'backward':
                 currentLinearVel = Math.max(currentLinearVel - LINEAR_STEP, -MAX_LINEAR_VEL);
-                break;
-              case 'left':
+          break;
+        case 'left':
                 currentAngularVel = Math.min(currentAngularVel + ANGULAR_STEP, MAX_ANGULAR_VEL);
-                break;
-              case 'right':
+          break;
+        case 'right':
                 currentAngularVel = Math.max(currentAngularVel - ANGULAR_STEP, -MAX_ANGULAR_VEL);
-                break;
-              case 'stop':
+          break;
+        case 'stop':
                 currentLinearVel = 0.0;
                 currentAngularVel = 0.0;
                 break;
@@ -224,13 +224,19 @@ async function initROS() {
                 // Force battery update by resetting the timer
                 lastBatteryUpdate = 0;
                 break;
-            }
-            
+              case 'init':
+                // Stop the robot when initializing
+                currentLinearVel = 0.0;
+                currentAngularVel = 0.0;
+                publishVelocity();
+          break;
+      }
+      
             publishVelocity();
-            
-            // Send response back to client
-            ws.send(JSON.stringify({
-              status: 'success',
+      
+      // Send response back to client
+      ws.send(JSON.stringify({
+        status: 'success',
               command: command,
               velocities: {
                 linear: currentLinearVel,
@@ -245,15 +251,15 @@ async function initROS() {
               publishVelocity();
             }
           }
-        } catch (error) {
-          console.error('Error processing message:', error);
-          ws.send(JSON.stringify({
-            status: 'error',
-            message: error.message
-          }));
-        }
-      });
-    });
+    } catch (error) {
+      console.error('Error processing message:', error);
+      ws.send(JSON.stringify({
+        status: 'error',
+        message: error.message
+      }));
+    }
+  });
+});
 
     node.spin();
     console.log('ROS 2 node initialized successfully on domain ID:', process.env.ROS_DOMAIN_ID);
