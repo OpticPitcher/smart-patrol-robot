@@ -425,7 +425,7 @@
 
     <div class="main-container">
         <canvas id="videoCanvas" class="live-feed"></canvas>
-        <iframe class="minimap" src="/minimap.jpg" frameborder="0"></iframe>
+        <canvas id="mapCanvas" class="minimap"></canvas>
     </div>
 
     <div class="controls-section">
@@ -527,14 +527,22 @@
         // Initialize WebSocket connection
         let robotWs = null;
         let videoCanvas = document.getElementById('videoCanvas');
-        let ctx = videoCanvas.getContext('2d');
+        let mapCanvas = document.getElementById('mapCanvas');
+        let videoCtx = videoCanvas.getContext('2d');
+        let mapCtx = mapCanvas.getContext('2d');
         let img = new Image();
+        let currentMap = null;
+        let currentScan = null;
 
-        // Set initial canvas size
+        // Set initial canvas sizes
         function resizeCanvas() {
             const container = videoCanvas.parentElement;
             videoCanvas.width = container.clientWidth;
             videoCanvas.height = container.clientHeight;
+            
+            const mapContainer = mapCanvas.parentElement;
+            mapCanvas.width = mapContainer.clientWidth;
+            mapCanvas.height = mapContainer.clientHeight;
         }
 
         // Call resize on load and window resize
@@ -555,17 +563,14 @@
                         const response = JSON.parse(event.data);
                         
                         if (response.type === 'camera') {
-                            // Debug log
-                            console.log('Received camera data:', response.data.substring(0, 50) + '...');
-                            
-                            // Create base64 image data
                             const base64Image = 'data:image/jpeg;base64,' + response.data;
-                            
-                            // Debug log
-                            console.log('Created base64 image:', base64Image.substring(0, 50) + '...');
-                            
-                            // Load the image
                             img.src = base64Image;
+                        } else if (response.type === 'map') {
+                            currentMap = response.data;
+                            drawMap();
+                        } else if (response.type === 'scan') {
+                            currentScan = response.data;
+                            drawMap(); // Redraw map with new scan data
                         } else {
                             console.log('Command response:', response);
                         }
@@ -585,6 +590,81 @@
                     term.writeln('\r\nDisconnected from robot control server');
                     setTimeout(connectWebSocket, 5000);
                 };
+            }
+        }
+
+        // Draw the map and LiDAR data
+        function drawMap() {
+            if (!currentMap) return;
+
+            const ctx = mapCtx;
+            const width = mapCanvas.width;
+            const height = mapCanvas.height;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // Calculate scale to fit map in canvas
+            const scale = Math.min(
+                width / currentMap.width,
+                height / currentMap.height
+            );
+
+            // Center the map
+            const offsetX = (width - currentMap.width * scale) / 2;
+            const offsetY = (height - currentMap.height * scale) / 2;
+
+            // Draw map
+            for (let y = 0; y < currentMap.height; y++) {
+                for (let x = 0; x < currentMap.width; x++) {
+                    const index = y * currentMap.width + x;
+                    const value = currentMap.data[index];
+
+                    if (value === -1) { // Unknown
+                        ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+                    } else if (value > 50) { // Occupied
+                        ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+                    } else if (value < 50) { // Free
+                        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+                    }
+
+                    ctx.fillRect(
+                        offsetX + x * scale,
+                        offsetY + y * scale,
+                        scale,
+                        scale
+                    );
+                }
+            }
+
+            // Draw LiDAR scan if available
+            if (currentScan) {
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.lineWidth = 2;
+
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const maxRange = currentScan.range_max;
+                const scale = Math.min(width, height) / (2 * maxRange);
+
+                for (let i = 0; i < currentScan.ranges.length; i++) {
+                    const range = currentScan.ranges[i];
+                    if (range < currentScan.range_min || range > currentScan.range_max) continue;
+
+                    const angle = currentScan.angle_min + i * currentScan.angle_increment;
+                    const x = centerX + range * Math.cos(angle) * scale;
+                    const y = centerY + range * Math.sin(angle) * scale;
+
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+
+                ctx.closePath();
+                ctx.stroke();
             }
         }
 
@@ -614,10 +694,10 @@
                 videoCanvas.height = height;
                 
                 // Clear canvas
-                ctx.clearRect(0, 0, width, height);
+                videoCtx.clearRect(0, 0, width, height);
                 
                 // Draw the image
-                ctx.drawImage(img, 0, 0, width, height);
+                videoCtx.drawImage(img, 0, 0, width, height);
                 
                 console.log('Image drawn successfully');
             } catch (error) {

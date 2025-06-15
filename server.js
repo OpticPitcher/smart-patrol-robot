@@ -40,6 +40,8 @@ app.use(methodOverride('_method'))
 let node;
 let publisher;
 let cameraSubscriber;
+let scanSubscriber;
+let mapSubscriber;
 
 async function initROS() {
   try {
@@ -53,10 +55,7 @@ async function initROS() {
       '/camera/image_raw/compressed',
       (msg) => {
         try {
-          // Convert the image data to base64
           const imageData = Buffer.from(msg.data).toString('base64');
-          
-          // Broadcast the image data to all connected WebSocket clients
           wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
@@ -67,6 +66,64 @@ async function initROS() {
           });
         } catch (error) {
           console.error('Error processing camera data:', error);
+        }
+      }
+    );
+
+    // Subscribe to LiDAR scan data
+    scanSubscriber = node.createSubscription(
+      'sensor_msgs/msg/LaserScan',
+      '/scan',
+      (msg) => {
+        try {
+          wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({
+                type: 'scan',
+                data: {
+                  ranges: msg.ranges,
+                  angle_min: msg.angle_min,
+                  angle_max: msg.angle_max,
+                  angle_increment: msg.angle_increment,
+                  range_min: msg.range_min,
+                  range_max: msg.range_max
+                }
+              }));
+            }
+          });
+        } catch (error) {
+          console.error('Error processing scan data:', error);
+        }
+      }
+    );
+
+    // Subscribe to map data
+    mapSubscriber = node.createSubscription(
+      'nav_msgs/msg/OccupancyGrid',
+      '/map',
+      (msg) => {
+        try {
+          const mapData = {
+            width: msg.info.width,
+            height: msg.info.height,
+            resolution: msg.info.resolution,
+            origin: {
+              x: msg.info.origin.position.x,
+              y: msg.info.origin.position.y
+            },
+            data: msg.data
+          };
+          
+          wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({
+                type: 'map',
+                data: mapData
+              }));
+            }
+          });
+        } catch (error) {
+          console.error('Error processing map data:', error);
         }
       }
     );
