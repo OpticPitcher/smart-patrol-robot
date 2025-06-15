@@ -567,19 +567,13 @@
                 case ' ': // Space key
                     sendCommand('stop');
                     break;
-            }
-        });
-
-        // Add keyboard release handler to stop when keys are released
-        document.addEventListener('keyup', function(event) {
-            if (!isManualMode) return; // Only process keys in manual mode
-            
-            switch(event.key.toLowerCase()) {
-                case 'w':
-                case 's':
-                case 'a':
-                case 'd':
-                    sendCommand('stop');
+                case 'enter': // Enter key for full speed forward
+                    if (robotWs && robotWs.readyState === WebSocket.OPEN) {
+                        robotWs.send(JSON.stringify({
+                            type: 'control',
+                            command: 'full_forward'
+                        }));
+                    }
                     break;
             }
         });
