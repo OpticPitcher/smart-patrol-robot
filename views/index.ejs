@@ -463,7 +463,7 @@
             <div id="battery-status" class="battery-status">
                 <i class="fas fa-battery-full"></i>
                 <span id="battery-percentage">--%</span>
-            </div>
+        </div>
         </div>
         <div class="title">Welcome, <%= username %></div>
         <form action="/logout?_method=DELETE" method="POST" style="margin: 0;">
@@ -591,9 +591,29 @@
         let currentMap = null;
         let currentScan = null;
         let isManualMode = false;
+        let isConnected = false;
 
         // Initialize in auto mode
         toggleMode('auto');
+
+        // Update init button click handler
+        document.querySelector('button[onclick="sendCommand(\'init\')"]').onclick = function() {
+            if (!isConnected) {
+                connectWebSocket();
+                this.innerHTML = '<i class="fas fa-power-off"></i> Disconnect';
+                this.style.backgroundColor = 'rgba(255, 27, 107, 0.2)';
+            } else {
+                if (robotWs) {
+                    robotWs.close();
+                    robotWs = null;
+                }
+                this.innerHTML = '<i class="fas fa-power-off"></i> Init';
+                this.style.backgroundColor = 'transparent';
+                isConnected = false;
+                term.writeln('\r\nDisconnected from robot control server');
+                term.write('$ ');
+            }
+        };
 
         // Add keyboard controls
         document.addEventListener('keydown', function(event) {
@@ -686,10 +706,11 @@
                 robotWs = new WebSocket('ws://' + window.location.hostname + ':8766');
                 
                 robotWs.onopen = function() {
-                    console.log('Connected to robot control server');
+                        console.log('Connected to robot control server');
                     term.writeln('\r\nConnected to robot control server');
-                };
-                
+                    isConnected = true;
+                    };
+                    
                 robotWs.onmessage = function(event) {
                     try {
                         const response = JSON.parse(event.data);
@@ -719,12 +740,17 @@
                 robotWs.onerror = function(error) {
                         console.error('WebSocket error:', error);
                     term.writeln('\r\nWebSocket error: ' + error);
+                    isConnected = false;
                     };
                     
                 robotWs.onclose = function() {
                         console.log('Disconnected from robot control server');
                     term.writeln('\r\nDisconnected from robot control server');
-                    setTimeout(connectWebSocket, 5000);
+                    isConnected = false;
+                    // Update init button state
+                    const initButton = document.querySelector('button[onclick="sendCommand(\'init\')"]');
+                    initButton.innerHTML = '<i class="fas fa-power-off"></i> Init';
+                    initButton.style.backgroundColor = 'transparent';
                 };
             }
         }
@@ -846,12 +872,15 @@
             term.writeln('\r\nError loading image: ' + error);
         };
 
-        // Connect WebSocket when page loads
-        connectWebSocket();
-
-        // Update the sendCommand function to use the global robotWs
+        // Update sendCommand function to check connection
         async function sendCommand(command) {
             try {
+                if (!isConnected) {
+                    term.writeln('\r\nError: Not connected to robot. Press Init to connect.');
+                    term.write('$ ');
+                    return;
+                }
+                
                 if (robotWs && robotWs.readyState === WebSocket.OPEN) {
                     if (isManualMode) {
                         robotWs.send(JSON.stringify({
@@ -860,7 +889,7 @@
                         }));
                     } else {
                         term.writeln('\r\nManual mode is not active. Switch to manual mode to control the robot.');
-                    term.write('$ ');
+                        term.write('$ ');
                     }
                 } else {
                     console.error('WebSocket is not connected');
