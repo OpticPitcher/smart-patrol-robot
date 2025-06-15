@@ -517,10 +517,19 @@
                 }
             });
 
-            if (mode === 'manual') {
+            isManualMode = mode === 'manual';
+            
+            if (isManualMode) {
                 dpad.classList.add('enabled');
             } else {
                 dpad.classList.remove('enabled');
+                // Send mode change to server
+                if (robotWs && robotWs.readyState === WebSocket.OPEN) {
+                    robotWs.send(JSON.stringify({
+                        type: 'mode',
+                        mode: 'auto'
+                    }));
+                }
             }
         }
 
@@ -533,6 +542,47 @@
         let img = new Image();
         let currentMap = null;
         let currentScan = null;
+        let isManualMode = false;
+
+        // Initialize in auto mode
+        toggleMode('auto');
+
+        // Add keyboard controls
+        document.addEventListener('keydown', function(event) {
+            if (!isManualMode) return; // Only process keys in manual mode
+            
+            switch(event.key.toLowerCase()) {
+                case 'w':
+                    sendCommand('forward');
+                    break;
+                case 's':
+                    sendCommand('backward');
+                    break;
+                case 'a':
+                    sendCommand('left');
+                    break;
+                case 'd':
+                    sendCommand('right');
+                    break;
+                case ' ': // Space key
+                    sendCommand('stop');
+                    break;
+            }
+        });
+
+        // Add keyboard release handler to stop when keys are released
+        document.addEventListener('keyup', function(event) {
+            if (!isManualMode) return; // Only process keys in manual mode
+            
+            switch(event.key.toLowerCase()) {
+                case 'w':
+                case 's':
+                case 'a':
+                case 'd':
+                    sendCommand('stop');
+                    break;
+            }
+        });
 
         // Set initial canvas sizes
         function resizeCanvas() {
@@ -570,9 +620,12 @@
                             drawMap();
                         } else if (response.type === 'scan') {
                             currentScan = response.data;
-                            drawMap(); // Redraw map with new scan data
-                        } else {
-                            console.log('Command response:', response);
+                            drawMap();
+                        } else if (response.status === 'success' && response.velocities) {
+                            // Update terminal with current velocities
+                            term.writeln(`\r\nLinear: ${response.velocities.linear.toFixed(2)} m/s`);
+                            term.writeln(`Angular: ${response.velocities.angular.toFixed(2)} rad/s`);
+                            term.write('$ ');
                         }
                     } catch (error) {
                         console.error('Error processing WebSocket message:', error);
@@ -717,9 +770,15 @@
         async function sendCommand(command) {
             try {
                 if (robotWs && robotWs.readyState === WebSocket.OPEN) {
-                    robotWs.send(JSON.stringify({ command }));
-                    term.writeln(`\r\nExecuting command: ${command}`);
-                    term.write('$ ');
+                    if (isManualMode) {
+                        robotWs.send(JSON.stringify({
+                            type: 'control',
+                            command: command
+                        }));
+                    } else {
+                        term.writeln('\r\nManual mode is not active. Switch to manual mode to control the robot.');
+                        term.write('$ ');
+                    }
                 } else {
                     console.error('WebSocket is not connected');
                     term.writeln('\r\nError: WebSocket is not connected');
@@ -731,9 +790,6 @@
                 term.write('$ ');
             }
         }
-
-        // Initialize in auto mode
-        toggleMode('auto');
 
         // Initialize Terminal
         const term = new Terminal({
