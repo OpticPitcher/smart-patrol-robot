@@ -177,6 +177,10 @@ async function initROS() {
                 currentLinearVel = 0.0;
                 currentAngularVel = 0.0;
                 break;
+              case 'full_forward':
+                currentLinearVel = MAX_LINEAR_VEL;
+                currentAngularVel = 0.0;
+                break;
             }
             
             publishVelocity();
