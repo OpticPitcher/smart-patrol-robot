@@ -48,6 +48,9 @@ let publisher;
 let cameraSubscriber;
 let scanSubscriber;
 let mapSubscriber;
+let batterySubscriber;
+let lastBatteryUpdate = 0;
+const BATTERY_UPDATE_INTERVAL = 60000; // 60 seconds in milliseconds
 
 // Store current velocities
 let currentLinearVel = 0.0;
@@ -59,6 +62,42 @@ async function initROS() {
     node = new rclnodejs.Node('web_controller');
     publisher = node.createPublisher('geometry_msgs/msg/Twist', '/cmd_vel');
     
+    // Subscribe to battery state
+    batterySubscriber = node.createSubscription(
+      'sensor_msgs/msg/BatteryState',
+      '/battery_state',
+      (msg) => {
+        try {
+          const now = Date.now();
+          // Only send update if enough time has passed
+          if (now - lastBatteryUpdate >= BATTERY_UPDATE_INTERVAL) {
+            lastBatteryUpdate = now;
+            wss.clients.forEach((client) => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({
+                  type: 'battery',
+                  data: {
+                    percentage: msg.percentage,
+                    voltage: msg.voltage,
+                    current: msg.current,
+                    charge: msg.charge,
+                    capacity: msg.capacity,
+                    design_capacity: msg.design_capacity,
+                    power_supply_status: msg.power_supply_status,
+                    power_supply_health: msg.power_supply_health,
+                    power_supply_technology: msg.power_supply_technology,
+                    present: msg.present
+                  }
+                }));
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error processing battery data:', error);
+        }
+      }
+    );
+
     // Subscribe to camera feed
     cameraSubscriber = node.createSubscription(
       'sensor_msgs/msg/CompressedImage',
@@ -180,6 +219,10 @@ async function initROS() {
               case 'full_forward':
                 currentLinearVel = MAX_LINEAR_VEL;
                 currentAngularVel = 0.0;
+                break;
+              case 'battery':
+                // Force battery update by resetting the timer
+                lastBatteryUpdate = 0;
                 break;
             }
             
